@@ -148,7 +148,7 @@ void TclConsoleBase :: runShell()
         Tcl_DoOneEvent(TCL_ALL_EVENTS);
 }
 
-inline void TclConsoleBase :: moveCursor(const size_t from_pos, const size_t to_pos, const unsigned short int ws)
+void TclConsoleBase :: moveCursor(const size_t from_pos, const size_t to_pos, const unsigned short int ws)
 {
     if (from_pos == to_pos)
         return;
@@ -178,7 +178,7 @@ inline void TclConsoleBase :: moveCursor(const size_t from_pos, const size_t to_
     fflush(stdout);
 }
 
-inline void TclConsoleBase :: moveLeft(const size_t cur_pos, const unsigned short int ws) 
+void TclConsoleBase :: moveLeft(const size_t cur_pos, const unsigned short int ws) 
 {
     if (!cur_pos)
         return;
@@ -191,7 +191,7 @@ inline void TclConsoleBase :: moveLeft(const size_t cur_pos, const unsigned shor
     fflush(stdout);
 }
 
-inline void TclConsoleBase :: moveRight(const size_t cur_pos, const unsigned short int ws) 
+void TclConsoleBase :: moveRight(const size_t cur_pos, const unsigned short int ws) 
 {
     if (cur_pos == curCommand.size())
         return;
@@ -204,13 +204,13 @@ inline void TclConsoleBase :: moveRight(const size_t cur_pos, const unsigned sho
     fflush(stdout);
 }
 
-inline void TclConsoleBase :: printStdout(int c)
+void TclConsoleBase :: printStdout(int c)
 {
     putc(c, stdout);
     fflush(stdout);
 }
 
-inline void TclConsoleBase :: printCommand(const size_t from_pos, const unsigned short int ws)
+void TclConsoleBase :: printCommand(const size_t from_pos, const unsigned short int ws)
 {
    for (size_t i = from_pos; i < curCommand.size(); i++) 
        printStdout(curCommand[i]);
@@ -474,4 +474,7 @@ bool TclConsoleBase::execCommand(const string &command, bool showPrompt, string 
 }
 
 void TclConsoleBase::correctPathName(string& pathName)
+{}
+
+void TclConsoleBase::displayPrompt()
 {}

@@ -94,11 +94,11 @@ class TclConsoleBase
         virtual HandleKey HandleTab;
 #endif
 
-        virtual inline void moveCursor(const size_t from_pos, const size_t to_pos, const unsigned short int ws);
-        virtual inline void moveLeft(const size_t from_pos, const unsigned short int ws);
-        virtual inline void moveRight(const size_t from_pos, const unsigned short int ws);
-        virtual inline void printCommand(const size_t from_pos, const unsigned short int ws);
-        virtual inline void printStdout(int ch);
+        virtual void moveCursor(const size_t from_pos, const size_t to_pos, const unsigned short int ws);
+        virtual void moveLeft(const size_t from_pos, const unsigned short int ws);
+        virtual void moveRight(const size_t from_pos, const unsigned short int ws);
+        virtual void printCommand(const size_t from_pos, const unsigned short int ws);
+        virtual void printStdout(int ch);
 
     private:
         static TclConsoleBase *theInstance;
@@ -106,9 +106,8 @@ class TclConsoleBase
         std::map<std::string, std::string> varsHelp;
         std::mutex mutex;
 
-    private:
-        TclConsoleBase(Tcl_Interp* interp = NULL);
-
+    //private:
+    //    TclConsoleBase(Tcl_Interp* interp = NULL);
 };
 
 template <class Class>
