@@ -1,19 +1,32 @@
 #include <tcl.h>
+#include <termios.h>
 #include <pthread.h>
 #include <unistd.h>
 #include <signal.h>
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <assert.h>
+#include <curses.h>
 
 #include "tclConsoleBase.h"
 
 void exitHandler (ClientData tclPlatform)
 {}
 
-TclConsoleBase :: TclConsoleBase (string welcomeText, Platform *platform)
-    : platform(platform),
-    cmd(),
+void resume_shell(int)
+{
+    struct termios stdin_setting;
+    if (tcgetattr(fileno(stdout), &stdin_setting) == 0) {
+        stdin_setting.c_lflag &= ~ICANON;
+        stdin_setting.c_lflag &= ~ECHO;
+        stdin_setting.c_cc[VMIN] &= 1;
+        stdin_setting.c_cc[VTIME] = 0;
+        tcsetattr(fileno(stdin), TCSANOW, &stdin_setting);
+    }
+}
+
+TclConsoleBase :: TclConsoleBase (string welcomeText)
+    : cmd(),
     curCommand(),
     curCursorPos(0)
 {
@@ -22,7 +35,21 @@ TclConsoleBase :: TclConsoleBase (string welcomeText, Platform *platform)
         //Initialize the Tcl interpreter
         interp = Tcl_CreateInterp();
         Tcl_Init(interp);
+        Tcl_SetServiceMode (TCL_SERVICE_ALL);
     }
+
+    struct termios stdin_setting;
+    if (tcgetattr(fileno(stdout), &stdin_setting) == 0) {
+        stdin_setting.c_lflag &= ~ICANON;
+        stdin_setting.c_lflag &= ~ECHO;
+        stdin_setting.c_cc[VMIN] &= 1;
+        stdin_setting.c_cc[VTIME] = 0;
+        tcsetattr(fileno(stdin), TCSANOW, &stdin_setting);
+    }
+    
+    signal(SIGCONT, resume_shell);
+
+    theInstance = this;
 
     Tcl_CreateExitHandler(exitHandler, reinterpret_cast<ClientData> (platform));
 }
@@ -43,20 +70,21 @@ TclConsoleBase :: ~TclConsoleBase ()
 
 void TclConsoleBase :: runScript(const char *filename)
 {
-    platform->getMsgAdapter().printMessage("running scripts : \"%s\"\n", filename);
+    getPlatform()->getMsgAdapter().printMessage("running scripts : \"%s\"\n", filename);
 
     int ret = Tcl_EvalFile (interp, filename);
 
     fflush(stdout);
 
     if (ret == TCL_OK)
-        platform->getMsgAdapter().printMessage("%s\n", Tcl_GetStringResult(interp));
+        getPlatform()->getMsgAdapter().printMessage("%s\n", Tcl_GetStringResult(interp));
     else
-        platform->getMsgAdapter().printMessage("Error : %s\n", Tcl_GetStringResult(interp));
+        getPlatform()->getMsgAdapter().printMessage("Error : %s\n", Tcl_GetStringResult(interp));
 }
 
 void TclConsoleBase :: processShell()
 {
+    displayPrompt();
     while (1) {
         char key = getchar();
         switch (key) {
@@ -153,17 +181,17 @@ void TclConsoleBase :: moveCursor(const size_t from_pos, const size_t to_pos, co
     if (from_pos == to_pos)
         return;
 
-    int cur_row = (prompt_length + from_pos) / ws;
-    int cur_col = (prompt_length + from_pos) % ws;
-    int new_row = (prompt_length + to_pos) / ws;
-    int new_col = (prompt_length + to_pos) % ws;
+    int cur_row = (promptLength + from_pos) / ws;
+    int cur_col = (promptLength + from_pos) % ws;
+    int new_row = (promptLength + to_pos) / ws;
+    int new_col = (promptLength + to_pos) % ws;
 
     int row_diff = cur_row - new_row;
     int col_diff = cur_col - new_col;
 
     if (row_diff) {
         if (row_diff > 0)
-            fprintf(stdout, "%c%c%d%c", 0x1B, 0x5B, row_diff, 0x44);
+            fprintf(stdout, "%c%c%d%c", 0x1B, 0x5B, row_diff, 0x41);
         else
             fprintf(stdout, "%c%c%d%c", 0x1B, 0x5B, -row_diff, 0x42);
     }
@@ -183,7 +211,7 @@ void TclConsoleBase :: moveLeft(const size_t cur_pos, const unsigned short int w
     if (!cur_pos)
         return;
 
-    if (((prompt_length + cur_pos) % ws) == 0)
+    if (((promptLength + cur_pos) % ws) == 0)
         fprintf(stdout, "%c%c%c%c%c%d%c", 0x1B, 0x5B, 0x41, 0x1B, 0x5B, ws - 1, 0x43);
     else
         fprintf(stdout, "%c%c%c", 0x1B, 0x5B, 0x44);
@@ -196,7 +224,7 @@ void TclConsoleBase :: moveRight(const size_t cur_pos, const unsigned short int 
     if (cur_pos == curCommand.size())
         return;
 
-    if (((prompt_length + cur_pos + 1) % ws) == 0)
+    if (((promptLength + cur_pos + 1) % ws) == 0)
         fprintf(stdout, "%c%c%c%c%c%d%c", 0x1B, 0x5B, 0x42, 0x1B, 0x5B, ws - 1, 0x44);
     else
         fprintf(stdout, "%c%c%c", 0x1B, 0x5B, 0x43);
@@ -215,7 +243,7 @@ void TclConsoleBase :: printCommand(const size_t from_pos, const unsigned short 
    for (size_t i = from_pos; i < curCommand.size(); i++) 
        printStdout(curCommand[i]);
 
-   if ((prompt_length + curCommand.size()) % ws == 0)
+   if ((promptLength + curCommand.size()) % ws == 0)
        printStdout('\n');
 }
 
@@ -242,20 +270,23 @@ void TclConsoleBase :: HandleEnter(int key)
 
     cmd += curCommand;
     cmd += static_cast<char> (key);
-
     curCursorPos = 0;
     printStdout(key);
-
     curCommand.clear();
 
+    if (isCommandComplete(curCommand)) {
+        fflush(stdout);
 
-    char *tclCmd = strdup(cmd.c_str());
-    cmd.clear();
+        char *tclCmd = strdup(cmd.c_str());
+        cmd.clear();
 
-    Tcl_Eval( interp, tclCmd);
-    free(tclCmd);
+        execCommand(tclCmd, false);
 
-    //printPrompt();
+        free(tclCmd);
+        fflush(stdout);
+    }
+
+    displayPrompt();
 }
 
 void TclConsoleBase :: HandleLeft(int key)
@@ -310,7 +341,7 @@ TclConsoleBase *TclConsoleBase::theInstance = NULL;
 
 TclConsoleBase *TclConsoleBase::getInstance(Tcl_Interp* interp)
 {
-    assert(!theInstance);
+    assert(theInstance);
 
     return theInstance;
 }
@@ -399,8 +430,10 @@ int TclConsoleBase::help(ClientData, Tcl_Interp* interp, int argc,
 }
 
 //callback method that implements the set_prompt command
-void TclConsoleBase :: setPrompt(const string &prompt, bool display)
+void TclConsoleBase :: setPrompt(const string &welcomeText, bool display)
 {
+    prompt = welcomeText;
+    promptLength = prompt.length();
 }
 
 bool TclConsoleBase :: isCommandComplete(const string &command)
@@ -419,19 +452,14 @@ string TclConsoleBase::interpretCommand(const string &command, int *res)
 
     if (!command.empty())
     {
-        string modifiedCommand = command;
-
         //Do the Tcl evaluation
-        *res = Tcl_Eval(interp, modifiedCommand.c_str());
+        *res = Tcl_Eval(interp, command.c_str());
         //Get the string result of the executed command
-        result = Tcl_GetString(Tcl_GetObjResult(interp));
-        //Call the parent implementation
-        interpretCommand(modifiedCommand, res);
+        result = Tcl_GetStringResult(interp);
     }
 
     mutex.unlock();
     return result;
-
 }
 
 bool TclConsoleBase::execCommand(const string &command, bool showPrompt, string *result)
@@ -459,7 +487,7 @@ bool TclConsoleBase::execCommand(const string &command, bool showPrompt, string 
     if (!strRes.empty())
         strRes.append("\n");
 
-    platform->getMsgAdapter().printMessage("%s\n", strRes.c_str());
+    getPlatform()->getMsgAdapter().printMessage("%s\n", strRes.c_str());
 
     struct winsize ws;
     if (ioctl(fileno(stdout), TIOCGWINSZ, &ws) == 0 && ws.ws_col != 0) {
@@ -477,4 +505,6 @@ void TclConsoleBase::correctPathName(string& pathName)
 {}
 
 void TclConsoleBase::displayPrompt()
-{}
+{
+    getPlatform()->getMsgAdapter().printMessage("%s", prompt.c_str());
+}

@@ -17,7 +17,7 @@ class TclConsoleBase
         typedef int (*commandType) (void*, Tcl_Interp*, int, const char**);
 
     public:
-        TclConsoleBase (string welcomeText, Platform *);
+        TclConsoleBase (string welcomeText);
         ~TclConsoleBase();
 
         void runScript(const char *filename);
@@ -60,14 +60,17 @@ class TclConsoleBase
         //callback method that displays a help message
         int help(ClientData client_data, Tcl_Interp* interp, int argc, const char *argv[]);
 #endif
-    protected:
+    public:
         std::string cmd;
-        size_t prompt_length;
+        size_t promptLength;
 
         std::string curCommand;
         size_t curCursorPos;
 
         Platform *platform;
+        Platform *getPlatform() { return this->platform; };
+        void setPlatform (Platform *_platform) { platform = _platform; }
+
         Tcl_Interp* interp;
 
         void processShell();
@@ -106,6 +109,7 @@ class TclConsoleBase
         std::map<std::string, std::string> varsHelp;
         std::mutex mutex;
 
+        string prompt;
     //private:
     //    TclConsoleBase(Tcl_Interp* interp = NULL);
 };
