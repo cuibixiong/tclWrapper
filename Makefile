@@ -1,12 +1,12 @@
-all: tclWrapperShell.exe 
+all: tclshell.exe 
 
 SRCS += $(wildcard *.cpp)
 OBJS += $(patsubst %.cpp, %.o, $(SRCS))
 
-CXXFLAGS += -g -O0 
+CXXFLAGS += -g -O0 -I$(PWD)/third-party/include
 
-tclWrapperShell.exe: $(OBJS)
-	g++ $(OBJS) -ltcl8.5 -o $@
+tclshell.exe: $(OBJS)
+	g++ $(CXXFLAGS) $(OBJS) -L$(PWD)/third-party/lib -ltcl8.6 -lcurses -o $@
 
 clean:
 	rm -rf $(OBJS)
