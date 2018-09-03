@@ -21,7 +21,7 @@ class Platform
         Platform();
         ~Platform();
 
-        inline MsgAdapter &getMsgAdapter () const { assert(msgAdapter); return *msgAdapter; }
+        MsgAdapter &getMsgAdapter ();
 
     private:
         MsgAdapter *msgAdapter;

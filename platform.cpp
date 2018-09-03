@@ -1,7 +1,7 @@
 #include <string>
-
 #include <stdio.h>
 #include <stdarg.h>
+
 #include "platform.h"
 
 const char *get_version()
@@ -23,13 +23,20 @@ const char *get_version()
 }
 
 Platform :: Platform()
-    :  msgAdapter (NULL)
 {
     msgAdapter = new MsgAdapter();
 }
 
 Platform :: ~Platform()
-{}
+{
+    delete msgAdapter;
+}
+
+MsgAdapter& Platform :: getMsgAdapter()
+{
+    assert(msgAdapter);
+    return *msgAdapter;
+}
 
 MsgAdapter :: MsgAdapter ()
 {}
@@ -62,7 +69,9 @@ void MsgAdapter :: vprintfMessage(const char *format, va_list args)
     tmp = alloc_vprintf(format, args);
     if (!tmp)
         return;
-    // real output implement.
+
+    printf("%s", tmp);
+
     free(tmp);
 }
 
@@ -72,4 +81,6 @@ void MsgAdapter :: printMessage (const char *format, ...)
     va_start(args, format);
     vprintfMessage(format, args);    
     va_end(args);
+
+    fflush(stdout);
 }
