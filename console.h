@@ -19,11 +19,8 @@ public:
 		int BB(ClientData client_data, Tcl_Interp* interp, int argc, const char *argv[]);
 
 		//get the Console instance
-		static Console *getInstance(const string &welcomeText = "");
-		Platform *getPlatform() { return this->platform; };
-
+		static Console *getInstance();
 private:
 		//The instance
 		static Console *theInstance;
-private:
 };

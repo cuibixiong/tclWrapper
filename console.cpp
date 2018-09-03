@@ -1,7 +1,9 @@
-
 #include <mutex>
 
 #include "console.h"
+
+void Dummy_Tcl_DriversWatchProc(ClientData instanceData, int mask)
+{}
 
 int ConsoleOutput(ClientData, CONST char * buf, int toWrite, int *errorCode)
 {
@@ -51,7 +53,7 @@ Tcl_ChannelType consoleOutputChannelType =
     NULL, /*Tcl_DriverSeekProc* seekProc*/
     NULL, /*Tcl_DriverSetOptionProc*  setOptionProc*/
     NULL, /*Tcl_DriverGetOptionProc* getOptionProc*/
-    NULL, /*Tcl_DriverWatchProc* watchProc*/
+    Dummy_Tcl_DriversWatchProc, /*Tcl_DriverWatchProc* watchProc*/
     NULL, /*Tcl_DriverGetHandleProc* getHandleProc*/
     NULL, /*Tcl_DriverClose2Proc* close2Proc*/
     NULL, /*Tcl_DriverBlockModeProc* blockModeProc*/
@@ -78,7 +80,7 @@ Tcl_ChannelType consoleErrorChannelType =
     NULL, /*Tcl_DriverSeekProc* seekProc*/
     NULL, /*Tcl_DriverSetOptionProc*  setOptionProc*/
     NULL, /*Tcl_DriverGetOptionProc* getOptionProc*/
-    NULL, /*Tcl_DriverWatchProc* watchProc*/
+    Dummy_Tcl_DriversWatchProc, /*Tcl_DriverWatchProc* watchProc*/
     NULL, /*Tcl_DriverGetHandleProc* getHandleProc*/
     NULL, /*Tcl_DriverClose2Proc* close2Proc*/
     NULL, /*Tcl_DriverBlockModeProc* blockModeProc*/
@@ -98,33 +100,36 @@ Tcl_ChannelType consoleErrorChannelType =
 
 Console *Console::theInstance = NULL;
 
-Console *Console::getInstance(const string &welcomeText)
+Console *Console::getInstance()
 {
-    Platform platform;
-
-    if (!theInstance)
-        theInstance = new Console(welcomeText);
-
+    assert(theInstance);
     return theInstance;
 }
 
 int Console :: AA (ClientData client_data, Tcl_Interp* interp, int argc, const char *argv[])
-{}
+{
+    return TCL_OK;
+}
 
 int Console :: BB (ClientData client_data, Tcl_Interp* interp, int argc, const char *argv[])
-{}
+{
+    return TCL_OK;
+}
 
 //QTcl console constructor (init the QTextEdit & the attributes)
 Console :: Console(const string &welcomeText)
-    : TclConsoleBase(welcomeText, NULL)
+    : TclConsoleBase(welcomeText)
 {
     Platform *platform = new Platform(); 
+    theInstance = this;
+
+    TclConsoleBase::getInstance()->setPlatform(platform);
 
     //Register the set_prompt command
-    TclCallBack<Console>::registerMethod(this, (char*)"aa", &Console::AA, (char*)"oh, yes, I'm aa");
+    TclCallBack<Console>::registerMethod(this, (char*)"A-1", &Console::AA, (char*)"oh, yes, I'm aa");
 
     //Register the set_prompt command
-    TclCallBack<Console>::registerMethod(this, (char*)"bb", &Console::BB, (char*)"oh, yes, I'm bb");
+    TclCallBack<Console>::registerMethod(this, (char*)"B-1", &Console::BB, (char*)"oh, yes, I'm bb");
 
     //Get the Tcl interpreter
     interp = TclConsoleBase::getInstance()->tclInterp();
@@ -159,7 +164,7 @@ Console :: Console(const string &welcomeText)
     }
 
     //set the Tcl Prompt
-    TclConsoleBase::setPrompt("Tclwrapper shell $ ");
+    TclConsoleBase::setPrompt(welcomeText);
 }
 
 //Destructor
